@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency Exchange Rate WDC</title>
+    <!-- Load the Tableau WDC library -->
+    <script src="https://cdn.jsdelivr.net/gh/tableau/webdataconnector-sdk@2.3.0/lib/tableauwdc-2.3.latest.js"></script>
+</head>
+<body>
+    <h1>Currency Exchange Rate Web Data Connector</h1>
+    <button id="submitButton">Get Data</button>
+
+    <!-- JavaScript code for the Web Data Connector -->
+    <script type="text/javascript">
+        window.addEventListener('load', function() {
+            if (typeof tableau !== 'undefined') {
+                // Define the Tableau connector
+                var myConnector = tableau.makeConnector();
+
+                // Define the schema for the data that will be returned to Tableau
+                myConnector.getSchema = function(schemaCallback) {
+                    var cols = [{
+                        id: "currency",
+                        dataType: tableau.dataTypeEnum.string
+                    }, {
+                        id: "rate",
+                        dataType: tableau.dataTypeEnum.float
+                    }];
+
+                    var tableSchema = {
+                        id: "exchangeRates",
+                        alias: "Live Exchange Rates",
+                        columns: cols
+                    };
+
+                    schemaCallback([tableSchema]);
+                };
+
+                // Fetch data from the API and pass it to Tableau
+                myConnector.getData = function(table, doneCallback) {
+                    var apiURL = "https://api.exchangerate-api.com/v4/latest/JOD";
+                    var proxyURL = "https://cors-anywhere.herokuapp.com/" + apiURL;  // Using proxy to bypass CORB
+
+                    fetch(proxyURL)
+                        .then(function(response) {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok ' + response.statusText);
+                            }
+                            return response.json();
+                        })
+                        .then(function(data) {
+                            var tableData = [];
+
+                            tableData.push({
+                                "currency": "USD",
+                                "rate": data.rates.USD
+                            });
+                            tableData.push({
+                                "currency": "EUR",
+                                "rate": data.rates.EUR
+                            });
+                            tableData.push({
+                                "currency": "AED",
+                                "rate": data.rates.AED
+                            });
+
+                            table.appendRows(tableData);
+                            doneCallback();
+                        })
+                        .catch(function(error) {
+                            console.error('Fetch error: ', error);
+                            doneCallback();  // Call doneCallback even on error to handle errors gracefully
+                        });
+                };
+
+                // Register the connector with Tableau
+                tableau.registerConnector(myConnector);
+
+                // Event listener for the button to initiate the data fetch
+                document.querySelector("#submitButton").addEventListener("click", function() {
+                    tableau.connectionName = "Exchange Rate Data"; // This will be the name of the data source in Tableau
+                    tableau.submit(); // This sends the connector object to Tableau
+                });
+            } else {
+                console.error('Tableau is not defined. Make sure the Tableau WDC library is loaded correctly.');
+            }
+        });
+    </script>
+</body>
+</html>
